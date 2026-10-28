@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Resume Matcher</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: Arial, sans-serif;
+      background: #f4f7fb; color: #182238;
+    }
+    main { max-width: 850px; margin: 40px auto; padding: 20px; }
+    header { text-align: center; margin-bottom: 30px; }
+    header p { color: #65718a; }
+    section {
+      background: white; padding: 24px; margin: 18px 0;
+      border-radius: 14px; box-shadow: 0 3px 15px #1725540d;
+    }
+    label { display: block; font-weight: bold; margin: 16px 0 8px; }
+    textarea, input[type=file] {
+      width: 100%; padding: 12px; border: 1px solid #cbd5e1;
+      border-radius: 8px; font: inherit;
+    }
+    textarea { min-height: 150px; resize: vertical; }
+    button {
+      margin-top: 18px; padding: 13px 20px; border: 0;
+      border-radius: 8px; background: #2563eb; color: white;
+      font-size: 16px; cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: wait; }
+    #status { color: #475569; white-space: pre-wrap; }
+    #results { display: none; }
+    .score { font-size: 38px; font-weight: bold; color: #2563eb; }
+    .tag {
+      display: inline-block; padding: 7px 10px; margin: 4px;
+      border-radius: 20px; background: #dcfce7; color: #166534;
+    }
+    .missing { background: #fee2e2; color: #991b1b; }
+    footer { text-align: center; color: #64748b; font-size: 13px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Smart Resume Matcher</h1>
+    <p>Compare your resume with a job description and discover skill gaps.</p>
+  </header>
+
+  <section>
+    <h2>1. Upload your resume</h2>
+    <label for="resume">Resume file (PDF or TXT)</label>
+    <input id="resume" type="file" accept=".pdf,.txt">
+    <p id="status">Your resume is processed in this browser.</p>
+
+    <label for="job">2. Paste the job description</label>
+    <textarea id="job" placeholder="Paste the complete job description here..."></textarea>
+
+    <button id="analyze">Analyze Resume</button>
+  </section>
+
+  <section id="results">
+    <h2>Matching results</h2>
+    <div class="score" id="score">0%</div>
+    <p id="summary"></p>
+    <h3>Skills found in your resume</h3>
+    <div id="found"></div>
+    <h3>Potential skills to develop</h3>
+    <div id="missing"></div>
+    <p><small>This is a basic keyword-based estimate, not an assessment of your qualifications.</small></p>
+  </section>
+
+  <footer>Smart Resume Matcher · GitHub Pages</footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+const skills = [
+  "python", "sql", "java", "javascript", "html", "css",
+  "react", "node.js", "fastapi", "flask", "django",
+  "machine learning", "deep learning", "artificial intelligence",
+  "data analysis", "pandas", "numpy", "scikit-learn",
+  "excel", "power bi", "tableau", "statistics",
+  "communication", "project management", "git", "github",
+  "aws", "azure", "docker", "rest api", "postgresql",
+  "mysql", "tensorflow", "pytorch", "data visualization"
+];
+
+const resumeInput = document.getElementById("resume");
+const statusEl = document.getElementById("status");
+const button = document.getElementById("analyze");
+let resumeText = "";
+
+resumeInput.addEventListener("change", async () => {
+  resumeText = "";
+  const file = resumeInput.files[0];
+  if (!file) return;
+
+  statusEl.textContent = "Reading resume...";
+  try {
+    if (file.name.toLowerCase().endsWith(".txt")) {
+      resumeText = await file.text();
+    } else if (file.name.toLowerCase().endsWith(".pdf")) {
+      const pdf = await pdfjsLib.getDocument({
+        data: await file.arrayBuffer()
+      }).promise;
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        resumeText += content.items.map(item => item.str).join(" ") + " ";
+      }
+    } else {
+      throw new Error("Please choose a PDF or TXT file.");
+    }
+    if (!resumeText.trim()) {
+      throw new Error("No readable text found. Scanned PDFs may need OCR.");
+    }
+    statusEl.textContent = "Resume loaded successfully.";
+  } catch (error) {
+    statusEl.textContent = error.message || "Could not read the file.";
+    resumeText = "";
+  }
+});
+
+function findSkills(text) {
+  const normalized = text.toLowerCase();
+  return skills.filter(skill => {
+    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp("(^|[^a-z0-9+#.])" + escaped +
+      "(?=$|[^a-z0-9+#.])", "i").test(normalized);
+  });
+}
+
+button.addEventListener("click", () => {
+  const jobText = document.getElementById("job").value.trim();
+  if (!resumeText) {
+    statusEl.textContent = "Please upload a readable resume first.";
+    return;
+  }
+  if (!jobText) {
+    statusEl.textContent = "Please paste a job description first.";
+    return;
+  }
+
+  const required = findSkills(jobText);
+  const candidate = findSkills(resumeText);
+  const found = required.filter(skill => candidate.includes(skill));
+  const missing = required.filter(skill => !candidate.includes(skill));
+  const score = required.length
+    ? Math.round(found.length / required.length * 100)
+    : 0;
+
+  document.getElementById("score").textContent = score + "%";
+  document.getElementById("summary").textContent =
+    required.length
+      ? `Found ${found.length} of ${required.length} recognized job-description skills in your resume.`
+      : "No recognized skills from the built-in list were found in the job description.";
+
+  document.getElementById("found").innerHTML = "";
+  document.getElementById("missing").innerHTML = "";
+
+  found.forEach(skill => {
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = skill;
+    document.getElementById("found").appendChild(tag);
+  });
+
+  missing.forEach(skill => {
+    const tag = document.createElement("span");
+    tag.className = "tag missing";
+    tag.textContent = skill;
+    document.getElementById("missing").appendChild(tag);
+  });
+
+  if (!found.length) {
+    document.getElementById("found").textContent = "No matching skills detected.";
+  }
+  if (!missing.length) {
+    document.getElementById("missing").textContent =
+      required.length ? "No missing skills detected by this keyword check."
+                      : "No skills to compare.";
+  }
+
+  document.getElementById("results").style.display = "block";
+});
+</script>
+</body>
+</html>
