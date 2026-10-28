@@ -2,189 +2,319 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Resume Matcher</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; font-family: Arial, sans-serif;
-      background: #f4f7fb; color: #182238;
-    }
-    main { max-width: 850px; margin: 40px auto; padding: 20px; }
-    header { text-align: center; margin-bottom: 30px; }
-    header p { color: #65718a; }
-    section {
-      background: white; padding: 24px; margin: 18px 0;
-      border-radius: 14px; box-shadow: 0 3px 15px #1725540d;
-    }
-    label { display: block; font-weight: bold; margin: 16px 0 8px; }
-    textarea, input[type=file] {
-      width: 100%; padding: 12px; border: 1px solid #cbd5e1;
-      border-radius: 8px; font: inherit;
-    }
-    textarea { min-height: 150px; resize: vertical; }
-    button {
-      margin-top: 18px; padding: 13px 20px; border: 0;
-      border-radius: 8px; background: #2563eb; color: white;
-      font-size: 16px; cursor: pointer;
-    }
-    button:disabled { opacity: .6; cursor: wait; }
-    #status { color: #475569; white-space: pre-wrap; }
-    #results { display: none; }
-    .score { font-size: 38px; font-weight: bold; color: #2563eb; }
-    .tag {
-      display: inline-block; padding: 7px 10px; margin: 4px;
-      border-radius: 20px; background: #dcfce7; color: #166534;
-    }
-    .missing { background: #fee2e2; color: #991b1b; }
-    footer { text-align: center; color: #64748b; font-size: 13px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Resume Matcher</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+<style>
+:root{--bg:#0b1020;--panel:#151d32;--text:#f1f5ff;--muted:#a5b2cc;--purple:#9274ff;--cyan:#51e0d0;--border:#2b3854}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at top,#20244c,var(--bg) 55%);color:var(--text);font-family:Arial,sans-serif;min-height:100vh}
+.container{max-width:1100px;margin:auto;padding:35px 20px}
+header{text-align:center;margin-bottom:30px}
+.logo{display:inline-block;background:#292650;color:#c8bdff;padding:10px 16px;border-radius:20px;font-size:13px}
+h1{font-size:clamp(30px,5vw,48px);margin:20px 0 10px}
+h1 span{color:var(--cyan)}
+p{color:var(--muted);line-height:1.6}
+.layout{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.card{background:rgba(21,29,50,.96);border:1px solid var(--border);border-radius:18px;padding:23px;margin-bottom:20px}
+h2{font-size:19px;margin-top:0}
+label{display:block;margin:15px 0 8px;font-weight:bold;font-size:14px}
+textarea,input[type=file]{width:100%;background:#0d1528;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px}
+textarea{min-height:190px;resize:vertical;line-height:1.5}
+input[type=file]{font-size:13px}
+.hint{font-size:12px;color:var(--muted);margin-top:7px}
+button{border:0;border-radius:10px;padding:13px 17px;font-weight:bold;cursor:pointer}
+.primary{background:linear-gradient(100deg,var(--purple),#6b9dff);color:white;width:100%;font-size:16px;margin:5px 0 20px}
+.secondary{background:#222e49;color:var(--text);border:1px solid var(--border);margin:4px}
+button:hover{filter:brightness(1.12)}
+button:disabled{opacity:.5;cursor:wait}
+.status{font-size:13px;color:var(--cyan);min-height:18px}
+.hidden{display:none}
+.score{font-size:56px;font-weight:bold;color:var(--cyan)}
+.bar{height:9px;background:#29334b;border-radius:10px;overflow:hidden;margin:10px 0 20px}
+.bar div{height:100%;background:linear-gradient(90deg,var(--purple),var(--cyan));width:0;transition:width .5s}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{font-size:12px;padding:7px 10px;border-radius:20px;background:#203b3d;color:#8cf3d9}
+.pill.missing{background:#452a38;color:#ffb1c5}
+li{color:var(--muted);line-height:1.8}
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.metric{background:#0d1528;padding:16px;border-radius:12px}
+.metric strong{font-size:25px;display:block;margin-bottom:5px}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:15px}
+@media(max-width:720px){.layout,.result-grid{grid-template-columns:1fr}.container{padding:20px 13px}.card{padding:17px}}
+</style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>Smart Resume Matcher</h1>
-    <p>Compare your resume with a job description and discover skill gaps.</p>
-  </header>
+<div class="container">
+<header>
+<div class="logo">✦ AI-POWERED CAREER TOOL</div>
+<h1>Smart Resume <span>Matcher</span></h1>
+<p>Compare your resume with a job description. Discover skill gaps and improve your application.</p>
+</header>
 
-  <section>
-    <h2>1. Upload your resume</h2>
-    <label for="resume">Resume file (PDF or TXT)</label>
-    <input id="resume" type="file" accept=".pdf,.txt">
-    <p id="status">Your resume is processed in this browser.</p>
+<div class="layout">
+<section class="card">
+<h2>📄 Your Resume</h2>
+<label for="resumeFile">Upload resume (PDF, DOCX or TXT)</label>
+<input id="resumeFile" type="file" accept=".pdf,.docx,.txt">
+<p class="hint">Or paste your resume below. Pasted text takes priority over an uploaded file.</p>
+<label for="resumeText">Resume text</label>
+<textarea id="resumeText" placeholder="Paste your resume here: skills, education, experience and projects..."></textarea>
+</section>
 
-    <label for="job">2. Paste the job description</label>
-    <textarea id="job" placeholder="Paste the complete job description here..."></textarea>
+<section class="card">
+<h2>🎯 Job Description</h2>
+<label for="jobFile">Upload job description (PDF, DOCX or TXT)</label>
+<input id="jobFile" type="file" accept=".pdf,.docx,.txt">
+<p class="hint">Or paste the job description below. Pasted text takes priority over an uploaded file.</p>
+<label for="jobText">Job description text</label>
+<textarea id="jobText" placeholder="Paste the job description, required skills and responsibilities..."></textarea>
+</section>
+</div>
 
-    <button id="analyze">Analyze Resume</button>
-  </section>
+<button class="primary" id="analyzeBtn" onclick="analyzeResume()">Analyze Resume Match →</button>
+<div id="status" class="status"></div>
 
-  <section id="results">
-    <h2>Matching results</h2>
-    <div class="score" id="score">0%</div>
-    <p id="summary"></p>
-    <h3>Skills found in your resume</h3>
-    <div id="found"></div>
-    <h3>Potential skills to develop</h3>
-    <div id="missing"></div>
-    <p><small>This is a basic keyword-based estimate, not an assessment of your qualifications.</small></p>
-  </section>
+<section id="results" class="hidden">
+<div class="card">
+<h2>📊 Matching Results</h2>
+<div class="score" id="score">0%</div>
+<p>Estimated resume-to-job similarity</p>
+<div class="bar"><div id="scoreBar"></div></div>
+<div class="result-grid">
+<div class="metric"><strong id="matchedCount">0</strong><span>Relevant skills matched</span></div>
+<div class="metric"><strong id="missingCount">0</strong><span>Skills to work on</span></div>
+</div>
+<p class="hint">This is a text-based estimate, not a hiring probability or a guarantee of interview selection.</p>
+</div>
 
-  <footer>Smart Resume Matcher · GitHub Pages</footer>
-</main>
+<div class="layout">
+<div class="card"><h2>✅ Matched Skills</h2><div id="matchedSkills" class="pills"></div></div>
+<div class="card"><h2>⚠️ Missing Skills</h2><div id="missingSkills" class="pills"></div></div>
+</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<div class="card"><h2>💡 Recommendations</h2><ul id="recommendations"></ul></div>
+<div class="card"><h2>🧠 Skills Detected in Resume</h2><div id="allSkills" class="pills"></div></div>
+
+<div class="card">
+<h2>⬇ Download your report</h2>
+<button class="secondary" onclick="downloadReport('txt')">Download TXT</button>
+<button class="secondary" onclick="downloadReport('csv')">Download CSV</button>
+<button class="secondary" onclick="window.print()">Print / Save as PDF</button>
+</div>
+</section>
+<footer>Smart Resume Matcher · Your resume text is processed in your browser. PDF/DOCX extraction requires the libraries to load.</footer>
+</div>
+
 <script>
-const skills = [
-  "python", "sql", "java", "javascript", "html", "css",
-  "react", "node.js", "fastapi", "flask", "django",
-  "machine learning", "deep learning", "artificial intelligence",
-  "data analysis", "pandas", "numpy", "scikit-learn",
-  "excel", "power bi", "tableau", "statistics",
-  "communication", "project management", "git", "github",
-  "aws", "azure", "docker", "rest api", "postgresql",
-  "mysql", "tensorflow", "pytorch", "data visualization"
-];
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
 
-const resumeInput = document.getElementById("resume");
-const statusEl = document.getElementById("status");
-const button = document.getElementById("analyze");
-let resumeText = "";
+const SKILLS = {
+"python":["python"],"sql":["sql","sqlite","mysql","postgresql","postgres"],
+"machine learning":["machine learning","scikit-learn","sklearn"],
+"deep learning":["deep learning"],"data analysis":["data analysis","data analytics"],
+"pandas":["pandas"],"numpy":["numpy"],"excel":["excel","spreadsheets"],
+"power bi":["power bi"],"tableau":["tableau"],"statistics":["statistics","statistical analysis"],
+"communication":["communication","communicate effectively"],
+"problem solving":["problem solving","problem-solving"],
+"javascript":["javascript"],"typescript":["typescript"],
+"html":["html"],"css":["css"],"react":["react","react.js"],
+"node.js":["node.js","nodejs"],"fastapi":["fastapi"],"flask":["flask"],
+"django":["django"],"git":["git","github"],"docker":["docker"],
+"aws":["aws","amazon web services"],"azure":["azure"],
+"api development":["api development","rest api","restful api"],
+"data visualization":["data visualization","visualization"],
+"project management":["project management"],"leadership":["leadership"],
+"testing":["unit testing","automated testing","software testing"],
+"natural language processing":["natural language processing","nlp"],
+"generative ai":["generative ai","gen ai"],"llm":["llm","large language model","large language models"],
+"tensorflow":["tensorflow"],"pytorch":["pytorch"],
+"data cleaning":["data cleaning","data preprocessing"],
+"data structures":["data structures and algorithms","data structures"],
+"c++":["c++"],"java":["java"],"c#":["c#"],"linux":["linux"],
+"cybersecurity":["cybersecurity","information security"],
+"communication skills":["written communication","verbal communication"]
+};
 
-resumeInput.addEventListener("change", async () => {
-  resumeText = "";
-  const file = resumeInput.files[0];
-  if (!file) return;
+let latestReport = null;
 
-  statusEl.textContent = "Reading resume...";
-  try {
-    if (file.name.toLowerCase().endsWith(".txt")) {
-      resumeText = await file.text();
-    } else if (file.name.toLowerCase().endsWith(".pdf")) {
-      const pdf = await pdfjsLib.getDocument({
-        data: await file.arrayBuffer()
-      }).promise;
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        resumeText += content.items.map(item => item.str).join(" ") + " ";
-      }
-    } else {
-      throw new Error("Please choose a PDF or TXT file.");
-    }
-    if (!resumeText.trim()) {
-      throw new Error("No readable text found. Scanned PDFs may need OCR.");
-    }
-    statusEl.textContent = "Resume loaded successfully.";
-  } catch (error) {
-    statusEl.textContent = error.message || "Could not read the file.";
-    resumeText = "";
+async function extractFile(file){
+  if(!file) return "";
+  const ext=file.name.split(".").pop().toLowerCase();
+  if(ext==="txt") return await file.text();
+
+  if(ext==="docx"){
+    if(!window.mammoth) throw new Error("DOCX library did not load. Check your internet connection and reload.");
+    const result=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+    return result.value;
   }
-});
 
-function findSkills(text) {
-  const normalized = text.toLowerCase();
-  return skills.filter(skill => {
-    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp("(^|[^a-z0-9+#.])" + escaped +
-      "(?=$|[^a-z0-9+#.])", "i").test(normalized);
+  if(ext==="pdf"){
+    if(!window.pdfjsLib) throw new Error("PDF library did not load. Check your internet connection and reload.");
+    const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+    let text="";
+    for(let i=1;i<=pdf.numPages;i++){
+      const page=await pdf.getPage(i);
+      const content=await page.getTextContent();
+      text+=content.items.map(item=>item.str).join(" ")+"\n";
+    }
+    return text;
+  }
+  throw new Error("Unsupported file type. Please use PDF, DOCX or TXT.");
+}
+
+function normalize(text){
+  return text.toLowerCase().replace(/[^\p{L}\p{N}+#.]/gu," ").replace(/\s+/g," ").trim();
+}
+
+function findSkills(text){
+  const clean=normalize(text);
+  const found=[];
+  for(const [skill,aliases] of Object.entries(SKILLS)){
+    if(aliases.some(alias=>{
+      const escaped=alias.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+      return new RegExp("(^|[^a-z0-9])"+escaped+"($|[^a-z0-9])","i").test(clean);
+    })) found.push(skill);
+  }
+  return found;
+}
+
+function words(text){
+  return normalize(text).split(/\s+/).filter(w=>w.length>2);
+}
+
+function cosineSimilarity(a,b){
+  const stop=new Set(["the","and","for","with","you","your","are","our","this","that","from","will","have","has","was","were","but","not","all","can","who","job","role","work","their","they","about","into","using","use","required","responsibilities"]);
+  const tokenize=t=>words(t).filter(w=>!stop.has(w));
+  const A=tokenize(a), B=tokenize(b);
+  if(!A.length||!B.length) return 0;
+  const df={};
+  for(const term of new Set([...A,...B])){
+    df[term]=(A.includes(term)?1:0)+(B.includes(term)?1:0);
+  }
+  function vector(arr){
+    const counts={};
+    arr.forEach(w=>counts[w]=(counts[w]||0)+1);
+    const v={};
+    for(const [term,count] of Object.entries(counts)){
+      const idf=Math.log(3/(1+(df[term]||0)))+1;
+      v[term]=(1+Math.log(count))*idf;
+    }
+    return v;
+  }
+  const va=vector(A), vb=vector(B);
+  let dot=0, na=0, nb=0;
+  for(const v of Object.values(va)) na+=v*v;
+  for(const v of Object.values(vb)) nb+=v*v;
+  for(const [term,v] of Object.entries(va)) dot+=v*(vb[term]||0);
+  return na&&nb?dot/(Math.sqrt(na)*Math.sqrt(nb)):0;
+}
+
+async function analyzeResume(){
+  const btn=document.getElementById("analyzeBtn");
+  const status=document.getElementById("status");
+  btn.disabled=true;
+  status.textContent="Reading your documents...";
+  try{
+    const resumePaste=document.getElementById("resumeText").value.trim();
+    const jobPaste=document.getElementById("jobText").value.trim();
+    const resume=resumePaste||await extractFile(document.getElementById("resumeFile").files[0]);
+    const job=jobPaste||await extractFile(document.getElementById("jobFile").files[0]);
+
+    if(resume.trim().length<30) throw new Error("Please paste your resume or upload a resume with readable text.");
+    if(job.trim().length<30) throw new Error("Please paste the job description or upload a file with readable text.");
+
+    status.textContent="Comparing skills and text...";
+    const resumeSkills=findSkills(resume);
+    const jobSkills=findSkills(job);
+    const matched=jobSkills.filter(s=>resumeSkills.includes(s));
+    const missing=jobSkills.filter(s=>!resumeSkills.includes(s));
+    const similarity=cosineSimilarity(resume,job);
+    const coverage=jobSkills.length?matched.length/jobSkills.length:0;
+    const score=Math.round((similarity*.55+coverage*.45)*100);
+
+    const recommendations=[];
+    if(missing.length){
+      recommendations.push("Address relevant skill gaps where you have genuine experience or can gain it: "+missing.join(", ")+".");
+      recommendations.push("Add specific projects, measurable results and evidence for skills you actually possess.");
+    }
+    if(!resumeSkills.length) recommendations.push("Add a clearly structured skills section using the tools and technologies you genuinely know.");
+    if(!resume.toLowerCase().includes("project")) recommendations.push("Consider including relevant projects that demonstrate your abilities.");
+    if(!resume.toLowerCase().includes("experience")) recommendations.push("Make your relevant work, internship, volunteer or project experience easy to identify.");
+    recommendations.push("Tailor your summary and bullet points to the role, without inventing qualifications.");
+    if(!jobSkills.length) recommendations.push("Few supported skills were detected in the job description; review the description manually.");
+
+    latestReport={score,matched,missing,resumeSkills,jobSkills,recommendations};
+    document.getElementById("score").textContent=score+"%";
+    document.getElementById("scoreBar").style.width=score+"%";
+    document.getElementById("matchedCount").textContent=matched.length;
+    document.getElementById("missingCount").textContent=missing.length;
+    renderPills("matchedSkills",matched,false);
+    renderPills("missingSkills",missing,true);
+    renderPills("allSkills",resumeSkills,false);
+    document.getElementById("recommendations").innerHTML="";
+    recommendations.forEach(t=>{
+      const li=document.createElement("li");
+      li.textContent=t;
+      document.getElementById("recommendations").appendChild(li);
+    });
+    document.getElementById("results").classList.remove("hidden");
+    status.textContent="Analysis complete.";
+    document.getElementById("results").scrollIntoView({behavior:"smooth"});
+  }catch(error){
+    status.textContent=error.message||"Could not analyze these files.";
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+function renderPills(id,items,isMissing){
+  const el=document.getElementById(id);
+  el.innerHTML="";
+  if(!items.length){
+    el.textContent="No skills detected.";
+    return;
+  }
+  items.forEach(item=>{
+    const span=document.createElement("span");
+    span.className="pill"+(isMissing?" missing":"");
+    span.textContent=item;
+    el.appendChild(span);
   });
 }
 
-button.addEventListener("click", () => {
-  const jobText = document.getElementById("job").value.trim();
-  if (!resumeText) {
-    statusEl.textContent = "Please upload a readable resume first.";
-    return;
+function downloadReport(type){
+  if(!latestReport){alert("Analyze a resume first.");return;}
+  const r=latestReport;
+  const rows=[
+    ["Resume Match Report"],
+    ["Similarity score",r.score+"%"],
+    ["Matched skills",r.matched.join(", ")],
+    ["Missing job skills",r.missing.join(", ")],
+    ["Skills detected in resume",r.resumeSkills.join(", ")],
+    ["Recommendations",r.recommendations.join(" | ")]
+  ];
+  let content, mime, filename;
+  if(type==="csv"){
+    content=rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\r\n");
+    mime="text/csv;charset=utf-8";
+    filename="resume-match-report.csv";
+  }else{
+    content=rows.map(row=>row.join(": ")).join("\n");
+    mime="text/plain;charset=utf-8";
+    filename="resume-match-report.txt";
   }
-  if (!jobText) {
-    statusEl.textContent = "Please paste a job description first.";
-    return;
-  }
-
-  const required = findSkills(jobText);
-  const candidate = findSkills(resumeText);
-  const found = required.filter(skill => candidate.includes(skill));
-  const missing = required.filter(skill => !candidate.includes(skill));
-  const score = required.length
-    ? Math.round(found.length / required.length * 100)
-    : 0;
-
-  document.getElementById("score").textContent = score + "%";
-  document.getElementById("summary").textContent =
-    required.length
-      ? `Found ${found.length} of ${required.length} recognized job-description skills in your resume.`
-      : "No recognized skills from the built-in list were found in the job description.";
-
-  document.getElementById("found").innerHTML = "";
-  document.getElementById("missing").innerHTML = "";
-
-  found.forEach(skill => {
-    const tag = document.createElement("span");
-    tag.className = "tag";
-    tag.textContent = skill;
-    document.getElementById("found").appendChild(tag);
-  });
-
-  missing.forEach(skill => {
-    const tag = document.createElement("span");
-    tag.className = "tag missing";
-    tag.textContent = skill;
-    document.getElementById("missing").appendChild(tag);
-  });
-
-  if (!found.length) {
-    document.getElementById("found").textContent = "No matching skills detected.";
-  }
-  if (!missing.length) {
-    document.getElementById("missing").textContent =
-      required.length ? "No missing skills detected by this keyword check."
-                      : "No skills to compare.";
-  }
-
-  document.getElementById("results").style.display = "block";
-});
+  const blob=new Blob([content],{type:mime});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=filename;a.click();
+  URL.revokeObjectURL(url);
+}
 </script>
 </body>
 </html>
